@@ -19,7 +19,6 @@ const colors = {
     gray: "\x1b[90m",
 };
 
-// --- Logger Baru ---
 const logger = {
     info: (msg) => console.log(`${colors.cyan}[i] ${msg}${colors.reset}`),
     warn: (msg) => console.log(`${colors.yellow}[!] ${msg}${colors.reset}`),
