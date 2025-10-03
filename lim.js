@@ -19,6 +19,7 @@ const colors = {
     gray: "\x1b[90m",
 };
 
+// --- Logger Baru ---
 const logger = {
     info: (msg) => console.log(`${colors.cyan}[i] ${msg}${colors.reset}`),
     warn: (msg) => console.log(`${colors.yellow}[!] ${msg}${colors.reset}`),
@@ -122,28 +123,8 @@ const playGame = async (privateKey, proxy, accountIndex, gameConfig, playCount) 
     }
 };
 
-const selectGame = (rl) => new Promise((resolve, reject) => {
-    logger.step('Please select a game to play:');
-    Object.keys(GAMES).forEach(key => logger.info(`[${key}] ${GAMES[key].name}`));
-    // Using colors directly in rl.question as the new logger doesn't have a specific 'input' method
-    rl.question(`${colors.yellow}[?] Enter the number of your choice: ${colors.reset}`, (input) => {
-        if (GAMES[input.trim()]) resolve(GAMES[input.trim()]);
-        else reject(new Error('Invalid selection. Please run the script again.'));
-    });
-});
-
-const getScoreRange = (rl, gameConfig) => new Promise((resolve, reject) => {
-    logger.step('Set your desired score range (press Enter to use default).');
-    rl.question(`${colors.yellow}[?] Enter minimum score (default: ${gameConfig.minScore}): ${colors.reset}`, (minInput) => {
-        rl.question(`${colors.yellow}[?] Enter maximum score (default: ${gameConfig.maxScore}): ${colors.reset}`, (maxInput) => {
-            const minScore = minInput.trim() === '' ? gameConfig.minScore : parseInt(minInput, 10);
-            const maxScore = maxInput.trim() === '' ? gameConfig.maxScore : parseInt(maxInput, 10);
-            if (isNaN(minScore) || isNaN(maxScore)) return reject(new Error('Invalid score. Please enter numbers only.'));
-            if (minScore > maxScore) return reject(new Error('Minimum score cannot be greater than the maximum score.'));
-            resolve({ minScore, maxScore });
-        });
-    });
-});
+// Fungsi selectGame dan getScoreRange dihapus/diperbarui karena bot akan memainkan SEMUA game.
+// Hanya fungsi getPlayCount yang dipertahankan.
 
 const getPlayCount = (rl) => new Promise((resolve, reject) => {
     logger.step('Set how many games to play per account.');
@@ -159,45 +140,62 @@ const main = async () => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
     try {
-        const selectedGame = await selectGame(rl);
-        const scoreRange = await getScoreRange(rl, selectedGame);
         const playCount = await getPlayCount(rl);
         rl.close();
 
-        const finalGameConfig = { ...selectedGame, ...scoreRange };
-        logger.success(`Game set to: ${finalGameConfig.name}`);
-        logger.success(`Score range set to: ${finalGameConfig.minScore} - ${finalGameConfig.maxScore}`);
-        logger.success(`Games to play per account: ${playCount}\n`);
+        // Daftar kunci game dalam urutan yang diinginkan: '1', '2', '3', '4'
+        const gameKeys = Object.keys(GAMES).sort(); 
+        
+        logger.summary(`MODE OTOMATIS: Memainkan ${gameKeys.length} game (${GAMES['1'].name}, ${GAMES['2'].name}, ...) sebanyak ${playCount} kali per akun.\n`);
         
         let proxies = [];
         try {
-            // Using logger.info for general information
             proxies = fs.readFileSync('proxies.txt', 'utf8').split('\n').filter(p => p.trim() !== '');
             if (proxies.length > 0) logger.info(`Successfully loaded ${proxies.length} proxies.`);
         } catch {
-            // Using logger.warn for non-critical issues
             logger.warn('proxies.txt file not found or is empty. Running without proxies.');
         }
 
         const privateKeys = Object.keys(process.env).filter(key => key.startsWith('PRIVATE_KEY_')).map(key => process.env[key]);
-        if (privateKeys.length === 0) return logger.error("No private keys found in .env file."); // Using logger.error
+        if (privateKeys.length === 0) return logger.critical("No private keys found in .env file. Please add PRIVATE_KEY_1, PRIVATE_KEY_2, etc.");
 
         logger.info(`Found ${privateKeys.length} wallet(s) to process.`);
+        
+        // Loop melalui setiap Private Key
         for (let i = 0; i < privateKeys.length; i++) {
-            if (privateKeys[i]) {
-                const proxy = proxies.length > 0 ? proxies[i % proxies.length] : null;
-                await playGame(privateKeys[i], proxy, i, finalGameConfig, playCount);
-                if (i < privateKeys.length - 1) {
-                    logger.info('Waiting for 5 seconds before starting the next account...');
-                    await sleep(5000);
-                }
+            const privateKey = privateKeys[i];
+            if (!privateKey) continue;
+            
+            const proxy = proxies.length > 0 ? proxies[i % proxies.length] : null;
+
+            // Loop melalui setiap Game dalam urutan (1, 2, 3, 4)
+            for (const key of gameKeys) {
+                const gameConfig = GAMES[key];
+                
+                logger.section(`[AKUN ${i + 1}] Memulai Game: ${gameConfig.name} (Score: ${gameConfig.minScore}-${gameConfig.maxScore})`);
+                
+                // Panggil playGame dengan konfigurasi game saat ini
+                await playGame(privateKey, proxy, i, gameConfig, playCount);
+                
+                // Tambahkan jeda antara pergantian game
+                logger.info(`[AKUN ${i + 1}] Selesai ${gameConfig.name}. Menunggu 10 detik sebelum game berikutnya...`);
+                await sleep(10000);
+            }
+
+            // Tambahkan jeda yang lebih lama antara pergantian akun
+            if (i < privateKeys.length - 1) {
+                logger.step('--------------------------------------------------');
+                logger.step(`AKUN ${i + 1} SELESAI. Menunggu 30 detik sebelum memulai AKUN ${i + 2}...`);
+                logger.step('--------------------------------------------------');
+                await sleep(30000);
             }
         }
-        logger.summary("--- All wallets have been processed. Bot finished. ---"); // Using logger.summary for final message
+        
+        logger.summary("--- Semua wallet telah diproses melalui SEMUA game. Bot selesai. ---");
 
     } catch (error) {
-        logger.critical(error.message); // Using logger.critical for main function error
-        rl.close();
+        logger.critical(error.message);
+        // rl.close() tidak diperlukan karena sudah dipanggil setelah getPlayCount
     }
 };
 
