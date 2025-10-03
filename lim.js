@@ -48,9 +48,9 @@ const logger = {
 // -------------------
 
 const GAMES = {
-    '1': { name: 'HexShot', gameType: 'hex-shooter', referer: 'https://play.irys.xyz/hexshot', minScore: 18000, maxScore: 100000 },
-    '2': { name: 'Snake', gameType: 'snake', referer: 'https://play.irys.xyz/snake', minScore: 100, maxScore: 10000 },
-    '3': { name: 'Asteroids', gameType: 'asteroids', referer: 'https://play.irys.xyz/asteroids', minScore: 25000, maxScore: 500000 },
+    '1': { name: 'Snake', gameType: 'snake', referer: 'https://play.irys.xyz/snake', minScore: 100, maxScore: 10000 },
+    '2': { name: 'Asteroids', gameType: 'asteroids', referer: 'https://play.irys.xyz/asteroids', minScore: 25000, maxScore: 500000 },
+    '3': { name: 'HexShot', gameType: 'hex-shooter', referer: 'https://play.irys.xyz/hexshot', minScore: 18000, maxScore: 100000 },
     '4': { name: 'Missile Command', gameType: 'missile-command', referer: 'https://play.irys.xyz/missile', minScore: 50000, maxScore: 1500000 }
 };
 
