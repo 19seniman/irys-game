@@ -20,14 +20,14 @@ const colors = {
 };
 
 const logger = {
-    info: (msg) => console.log(`${colors.cyan}[i] ${msg}${colors.reset}`),
-    warn: (msg) => console.log(`${colors.yellow}[!] ${msg}${colors.reset}`),
-    error: (msg) => console.log(`${colors.red}[x] ${msg}${colors.reset}`),
-    success: (msg) => console.log(`${colors.green}[+] ${msg}${colors.reset}`),
-    loading: (msg) => console.log(`${colors.magenta}[*] ${msg}${colors.reset}`),
-    step: (msg) => console.log(`${colors.blue}[>] ${colors.bold}${msg}${colors.reset}`),
-    critical: (msg) => console.log(`${colors.red}${colors.bold}[FATAL] ${msg}${colors.reset}`),
-    summary: (msg) => console.log(`${colors.green}${colors.bold}[SUMMARY] ${msg}${colors.reset}`),
+    info: (msg) => console.log(`${colors.cyan}[и] ${msg}${colors.reset}`), // [и] - Информация
+    warn: (msg) => console.log(`${colors.yellow}[!] ${msg}${colors.reset}`), // [!] - Предупреждение
+    error: (msg) => console.log(`${colors.red}[х] ${msg}${colors.reset}`), // [х] - Ошибка
+    success: (msg) => console.log(`${colors.green}[+] ${msg}${colors.reset}`), // [+] - Успех
+    loading: (msg) => console.log(`${colors.magenta}[*] ${msg}${colors.reset}`), // [*] - Загрузка
+    step: (msg) => console.log(`${colors.blue}[>] ${colors.bold}${msg}${colors.reset}`), // [>] - Шаг
+    critical: (msg) => console.log(`${colors.red}${colors.bold}[ФАТАЛЬНО] ${msg}${colors.reset}`),
+    summary: (msg) => console.log(`${colors.green}${colors.bold}[СВОДКА] ${msg}${colors.reset}`),
     banner: () => {
         const border = `${colors.blue}${colors.bold}╔═════════════════════════════════════════╗${colors.reset}`;
         const title = `${colors.blue}${colors.bold}║   🍉 19Seniman From Insider    🍉    ║${colors.reset}`;
@@ -68,11 +68,11 @@ const playGame = async (privateKey, proxy, accountIndex, gameConfig, playCount) 
         const playerAddress = wallet.address;
         const agent = proxy ? new HttpsProxyAgent(proxy) : null;
         
-        logger.step(`--- [Account ${accountIndex + 1}] Starting session for: ${playerAddress} ---`);
-        if (proxy) logger.info(`[Account ${accountIndex + 1}] Using proxy: ${proxy.split('@').pop()}`);
+        logger.step(`--- [Аккаунт ${accountIndex + 1}] Начало сессии для: ${playerAddress} ---`);
+        if (proxy) logger.info(`[Аккаунт ${accountIndex + 1}] Использование прокси: ${proxy.split('@').pop()}`);
 
         for (let gameNum = 1; gameNum <= playCount; gameNum++) {
-            const sessionLogPrefix = `[Account ${accountIndex + 1}][Game ${gameNum}/${playCount}]`;
+            const sessionLogPrefix = `[Аккаунт ${accountIndex + 1}][Игра ${gameNum}/${playCount}]`;
             
             const userAgent = randomUseragent.getRandom();
             const headers = { 'Content-Type': 'application/json', 'Referer': gameConfig.referer, 'User-Agent': userAgent };
@@ -83,15 +83,15 @@ const playGame = async (privateKey, proxy, accountIndex, gameConfig, playCount) 
             const startSignature = await wallet.signMessage(startMessage);
             const startPayload = { playerAddress, gameCost: GAME_COST, signature: startSignature, message: startMessage, timestamp: startTimestamp, sessionId, gameType: gameConfig.gameType };
 
-            logger.loading(`${sessionLogPrefix} Sending 'start' request...`);
+            logger.loading(`${sessionLogPrefix} Отправка запроса 'start'...`);
             const startResponse = await axios.post(`${API_BASE_URL}/start`, startPayload, { httpsAgent: agent, headers });
 
-            if (!startResponse.data.success) throw new Error(startResponse.data.message || 'Failed to start game.');
+            if (!startResponse.data.success) throw new Error(startResponse.data.message || 'Не удалось начать игру.');
             
             const returnedSessionId = startResponse.data.data.sessionId;
-            logger.success(`${sessionLogPrefix} Game started successfully! Session ID: ${returnedSessionId}`);
+            logger.success(`${sessionLogPrefix} Игра успешно начата! ID сессии: ${returnedSessionId}`);
 
-            logger.info(`${sessionLogPrefix} Simulating gameplay for ${GAMEPLAY_DELAY_MS / 1000} seconds...`);
+            logger.info(`${sessionLogPrefix} Симуляция игрового процесса в течение ${GAMEPLAY_DELAY_MS / 1000} секунд...`);
             await sleep(GAMEPLAY_DELAY_MS);
 
             const score = generateRandomScore(gameConfig.minScore, gameConfig.maxScore);
@@ -100,36 +100,36 @@ const playGame = async (privateKey, proxy, accountIndex, gameConfig, playCount) 
             const completeSignature = await wallet.signMessage(completeMessage);
             const completePayload = { playerAddress, gameType: gameConfig.gameType, score, signature: completeSignature, message: completeMessage, timestamp: completeTimestamp, sessionId: returnedSessionId };
 
-            logger.loading(`${sessionLogPrefix} Sending 'complete' request with score: ${score}...`);
+            logger.loading(`${sessionLogPrefix} Отправка запроса 'complete' со счетом: ${score}...`);
             const completeResponse = await axios.post(`${API_BASE_URL}/complete`, completePayload, { httpsAgent: agent, headers });
 
             if (completeResponse.data.success) {
-                logger.success(`${sessionLogPrefix} Game Completed! ${completeResponse.data.message}`);
+                logger.success(`${sessionLogPrefix} Игра завершена! ${completeResponse.data.message}`);
             } else {
-                throw new Error(completeResponse.data.message || 'Failed to complete game.');
+                throw new Error(completeResponse.data.message || 'Не удалось завершить игру.');
             }
 
             if (gameNum < playCount) {
-                logger.info(`${sessionLogPrefix} Waiting for 3 seconds before next game...`);
+                logger.info(`${sessionLogPrefix} Ожидание 3 секунд перед следующей игрой...`);
                 await sleep(3000);
             }
         }
 
     } catch (error) {
-        const address = wallet ? wallet.address : 'Unknown Address';
+        const address = wallet ? wallet.address : 'Неизвестный адрес';
         const errorMessage = error.response ? JSON.stringify(error.response.data) : error.message;
-        logger.error(`[Account ${accountIndex + 1}] (${address}) An error occurred: ${errorMessage}`);
+        logger.error(`[Аккаунт ${accountIndex + 1}] (${address}) Произошла ошибка: ${errorMessage}`);
     }
 };
 
-// Fungsi selectGame dan getScoreRange dihapus/diperbarui karena bot akan memainkan SEMUA game.
-// Hanya fungsi getPlayCount yang dipertahankan.
+// Функция выбора игры и диапазона счета удалена/обновлена, так как бот будет играть во ВСЕ игры.
+// Сохранена только функция getPlayCount.
 
 const getPlayCount = (rl) => new Promise((resolve, reject) => {
-    logger.step('Set how many games to play per account.');
-    rl.question(`${colors.yellow}[?] Enter number of games (default: 1): ${colors.reset}`, (input) => {
+    logger.step('Укажите, сколько игр нужно сыграть на каждом аккаунте.');
+    rl.question(`${colors.yellow}[?] Введите количество игр (по умолчанию: 1): ${colors.reset}`, (input) => {
         const count = input.trim() === '' ? 1 : parseInt(input, 10);
-        if (isNaN(count) || count <= 0) return reject(new Error('Invalid number. Please enter a positive number.'));
+        if (isNaN(count) || count <= 0) return reject(new Error('Неверное число. Пожалуйста, введите положительное число.'));
         resolve(count);
     });
 });
@@ -142,55 +142,55 @@ const main = async () => {
         const playCount = await getPlayCount(rl);
         rl.close();
 
-        // Daftar kunci game dalam urutan yang diinginkan: '1', '2', '3', '4'
+        // Список ключей игр в желаемом порядке: '1', '2', '3', '4'
         const gameKeys = Object.keys(GAMES).sort(); 
         
-        logger.summary(`MODE OTOMATIS: Memainkan ${gameKeys.length} game (${GAMES['1'].name}, ${GAMES['2'].name}, ...) sebanyak ${playCount} kali per akun.\n`);
+        logger.summary(`АВТОМАТИЧЕСКИЙ РЕЖИМ: Играет в ${gameKeys.length} игр (${GAMES['1'].name}, ${GAMES['2'].name}, ...) ${playCount} раз для каждого аккаунта.\n`);
         
         let proxies = [];
         try {
             proxies = fs.readFileSync('proxies.txt', 'utf8').split('\n').filter(p => p.trim() !== '');
-            if (proxies.length > 0) logger.info(`Successfully loaded ${proxies.length} proxies.`);
+            if (proxies.length > 0) logger.info(`Успешно загружено ${proxies.length} прокси.`);
         } catch {
-            logger.warn('proxies.txt file not found or is empty. Running without proxies.');
+            logger.warn('Файл proxies.txt не найден или пуст. Работа без прокси.');
         }
 
         const privateKeys = Object.keys(process.env).filter(key => key.startsWith('PRIVATE_KEY_')).map(key => process.env[key]);
-        if (privateKeys.length === 0) return logger.critical("No private keys found in .env file. Please add PRIVATE_KEY_1, PRIVATE_KEY_2, etc.");
+        if (privateKeys.length === 0) return logger.critical("Приватные ключи в файле .env не найдены. Пожалуйста, добавьте PRIVATE_KEY_1, PRIVATE_KEY_2 и т.д.");
 
-        logger.info(`Found ${privateKeys.length} wallet(s) to process.`);
+        logger.info(`Найдено ${privateKeys.length} кошельков для обработки.`);
         
-        // Loop melalui setiap Private Key
+        // Перебор каждого Приватного Ключа
         for (let i = 0; i < privateKeys.length; i++) {
             const privateKey = privateKeys[i];
             if (!privateKey) continue;
             
             const proxy = proxies.length > 0 ? proxies[i % proxies.length] : null;
 
-            // Loop melalui setiap Game dalam urutan (1, 2, 3, 4)
+            // Перебор каждой Игры в порядке (1, 2, 3, 4)
             for (const key of gameKeys) {
                 const gameConfig = GAMES[key];
                 
-                logger.section(`[AKUN ${i + 1}] Memulai Game: ${gameConfig.name} (Score: ${gameConfig.minScore}-${gameConfig.maxScore})`);
+                logger.section(`[АККАУНТ ${i + 1}] Начало игры: ${gameConfig.name} (Счет: ${gameConfig.minScore}-${gameConfig.maxScore})`);
                 
-                // Panggil playGame dengan konfigurasi game saat ini
+                // Вызов playGame с текущей конфигурацией игры
                 await playGame(privateKey, proxy, i, gameConfig, playCount);
                 
-                // Tambahkan jeda antara pergantian game
-                logger.info(`[AKUN ${i + 1}] Selesai ${gameConfig.name}. Menunggu 10 detik sebelum game berikutnya...`);
+                // Добавление задержки между сменой игр
+                logger.info(`[АККАУНТ ${i + 1}] Игра ${gameConfig.name} завершена. Ожидание 10 секунд перед следующей игрой...`);
                 await sleep(10000);
             }
 
-            // Tambahkan jeda yang lebih lama antara pergantian akun
+            // Добавление более длительной задержки между сменой аккаунтов
             if (i < privateKeys.length - 1) {
                 logger.step('--------------------------------------------------');
-                logger.step(`AKUN ${i + 1} SELESAI. Menunggu 30 detik sebelum memulai AKUN ${i + 2}...`);
+                logger.step(`АККАУНТ ${i + 1} ЗАВЕРШЕН. Ожидание 30 секунд перед запуском АККАУНТА ${i + 2}...`);
                 logger.step('--------------------------------------------------');
                 await sleep(30000);
             }
         }
         
-        logger.summary("--- Semua wallet telah diproses melalui SEMUA game. Bot selesai. ---");
+        logger.summary("--- Все кошельки обработаны для ВСЕХ игр. Бот завершил работу. ---");
 
     } catch (error) {
         logger.critical(error.message);
