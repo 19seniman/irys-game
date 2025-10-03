@@ -1,6 +1,6 @@
 require('dotenv').config();
 const fs = require('fs');
-const readline = require('readline');
+// const readline = require('readline'); // Удалено, так как больше не нужен интерактивный ввод
 const { Wallet } = require('ethers');
 const axios = require('axios');
 const { HttpsProxyAgent } = require('https-proxy-agent');
@@ -19,6 +19,7 @@ const colors = {
     gray: "\x1b[90m",
 };
 
+// --- Новый Логгер ---
 const logger = {
     info: (msg) => console.log(`${colors.cyan}[и] ${msg}${colors.reset}`), // [и] - Информация
     warn: (msg) => console.log(`${colors.yellow}[!] ${msg}${colors.reset}`), // [!] - Предупреждение
@@ -57,6 +58,10 @@ const GAMES = {
 const API_BASE_URL = 'https://play.irys.xyz/api/game';
 const GAME_COST = 0.001;
 const GAMEPLAY_DELAY_MS = 5000;
+
+// Константы для автоматизации
+const DAILY_DELAY_MS = 24 * 60 * 60 * 1000; // 24 часа в миллисекундах
+const DEFAULT_PLAY_COUNT = 1; // Количество игр, если не указано в DAILY_PLAY_COUNT в .env
 
 const generateRandomScore = (minScore, maxScore) => Math.floor(Math.random() * (maxScore - minScore + 1)) + minScore;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -122,79 +127,96 @@ const playGame = async (privateKey, proxy, accountIndex, gameConfig, playCount) 
     }
 };
 
-// Функция выбора игры и диапазона счета удалена/обновлена, так как бот будет играть во ВСЕ игры.
-// Сохранена только функция getPlayCount.
-
-const getPlayCount = (rl) => new Promise((resolve, reject) => {
-    logger.step('Укажите, сколько игр нужно сыграть на каждом аккаунте.');
-    rl.question(`${colors.yellow}[?] Введите количество игр (по умолчанию: 1): ${colors.reset}`, (input) => {
-        const count = input.trim() === '' ? 1 : parseInt(input, 10);
-        if (isNaN(count) || count <= 0) return reject(new Error('Неверное число. Пожалуйста, введите положительное число.'));
-        resolve(count);
-    });
-});
+// Функция getPlayCount удалена, так как интерактивный ввод больше не используется.
 
 const main = async () => {
     logger.banner();
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    
+    // Получаем количество игр из переменной окружения или используем значение по умолчанию.
+    const playCount = parseInt(process.env.DAILY_PLAY_COUNT, 10) || DEFAULT_PLAY_COUNT;
+    
+    // Список ключей игр в желаемом порядке: '1', '2', '3', '4'
+    const gameKeys = Object.keys(GAMES).sort(); 
+    
+    logger.summary(`РЕЖИМ АВТОМАТИЗАЦИИ (24 ЧАСА): Играет в ${gameKeys.length} игр (${GAMES['1'].name}, ${GAMES['2'].name}, ...) ${playCount} раз для каждого аккаунта.`);
+    logger.summary(`Следующий цикл будет повторяться каждые ${DAILY_DELAY_MS / (1000 * 60 * 60)} часов.\n`);
 
-    try {
-        const playCount = await getPlayCount(rl);
-        rl.close();
+    while (true) { // Бесконечный цикл для ежедневного повторения
+        
+        const startTime = Date.now();
+        logger.step('==================================================');
+        logger.step(`НАЧАЛО ЕЖЕДНЕВНОГО ЦИКЛА: ${new Date().toISOString()}`);
+        logger.step('==================================================');
 
-        // Список ключей игр в желаемом порядке: '1', '2', '3', '4'
-        const gameKeys = Object.keys(GAMES).sort(); 
-        
-        logger.summary(`АВТОМАТИЧЕСКИЙ РЕЖИМ: Играет в ${gameKeys.length} игр (${GAMES['1'].name}, ${GAMES['2'].name}, ...) ${playCount} раз для каждого аккаунта.\n`);
-        
-        let proxies = [];
         try {
-            proxies = fs.readFileSync('proxies.txt', 'utf8').split('\n').filter(p => p.trim() !== '');
-            if (proxies.length > 0) logger.info(`Успешно загружено ${proxies.length} прокси.`);
-        } catch {
-            logger.warn('Файл proxies.txt не найден или пуст. Работа без прокси.');
-        }
+            let proxies = [];
+            try {
+                proxies = fs.readFileSync('proxies.txt', 'utf8').split('\n').filter(p => p.trim() !== '');
+                if (proxies.length > 0) logger.info(`Успешно загружено ${proxies.length} прокси.`);
+            } catch {
+                logger.warn('Файл proxies.txt не найден или пуст. Работа без прокси.');
+            }
 
-        const privateKeys = Object.keys(process.env).filter(key => key.startsWith('PRIVATE_KEY_')).map(key => process.env[key]);
-        if (privateKeys.length === 0) return logger.critical("Приватные ключи в файле .env не найдены. Пожалуйста, добавьте PRIVATE_KEY_1, PRIVATE_KEY_2 и т.д.");
+            const privateKeys = Object.keys(process.env).filter(key => key.startsWith('PRIVATE_KEY_')).map(key => process.env[key]);
+            if (privateKeys.length === 0) {
+                logger.critical("Приватные ключи в файле .env не найдены. Добавьте PRIVATE_KEY_1, PRIVATE_KEY_2 и т.д. Бот остановлен.");
+                // В автоматическом режиме лучше не выходить, а ждать следующего цикла, если ошибка не критична для продолжения.
+                // Но здесь, без ключей, нет смысла продолжать.
+                break; 
+            }
 
-        logger.info(`Найдено ${privateKeys.length} кошельков для обработки.`);
-        
-        // Перебор каждого Приватного Ключа
-        for (let i = 0; i < privateKeys.length; i++) {
-            const privateKey = privateKeys[i];
-            if (!privateKey) continue;
+            logger.info(`Найдено ${privateKeys.length} кошельков для обработки.`);
             
-            const proxy = proxies.length > 0 ? proxies[i % proxies.length] : null;
+            // Перебор каждого Приватного Ключа
+            for (let i = 0; i < privateKeys.length; i++) {
+                const privateKey = privateKeys[i];
+                if (!privateKey) continue;
+                
+                const proxy = proxies.length > 0 ? proxies[i % proxies.length] : null;
 
-            // Перебор каждой Игры в порядке (1, 2, 3, 4)
-            for (const key of gameKeys) {
-                const gameConfig = GAMES[key];
-                
-                logger.section(`[АККАУНТ ${i + 1}] Начало игры: ${gameConfig.name} (Счет: ${gameConfig.minScore}-${gameConfig.maxScore})`);
-                
-                // Вызов playGame с текущей конфигурацией игры
-                await playGame(privateKey, proxy, i, gameConfig, playCount);
-                
-                // Добавление задержки между сменой игр
-                logger.info(`[АККАУНТ ${i + 1}] Игра ${gameConfig.name} завершена. Ожидание 10 секунд перед следующей игрой...`);
-                await sleep(10000);
-            }
+                // Перебор каждой Игры в порядке (1, 2, 3, 4)
+                for (const key of gameKeys) {
+                    const gameConfig = GAMES[key];
+                    
+                    logger.section(`[АККАУНТ ${i + 1}] Начало игры: ${gameConfig.name} (Счет: ${gameConfig.minScore}-${gameConfig.maxScore})`);
+                    
+                    // Вызов playGame с текущей конфигурацией игры
+                    await playGame(privateKey, proxy, i, gameConfig, playCount);
+                    
+                    // Добавление задержки между сменой игр
+                    logger.info(`[АККАУНТ ${i + 1}] Игра ${gameConfig.name} завершена. Ожидание 10 секунд перед следующей игрой...`);
+                    await sleep(10000);
+                }
 
-            // Добавление более длительной задержки между сменой аккаунтов
-            if (i < privateKeys.length - 1) {
-                logger.step('--------------------------------------------------');
-                logger.step(`АККАУНТ ${i + 1} ЗАВЕРШЕН. Ожидание 30 секунд перед запуском АККАУНТА ${i + 2}...`);
-                logger.step('--------------------------------------------------');
-                await sleep(30000);
+                // Добавление более длительной задержки между сменой аккаунтов
+                if (i < privateKeys.length - 1) {
+                    logger.step('--------------------------------------------------');
+                    logger.step(`АККАУНТ ${i + 1} ЗАВЕРШЕН. Ожидание 30 секунд перед запуском АККАУНТА ${i + 2}...`);
+                    logger.step('--------------------------------------------------');
+                    await sleep(30000);
+                }
             }
+            
+            logger.summary("--- Все кошельки обработаны для ВСЕХ игр. Цикл завершен. ---");
+
+        } catch (error) {
+            // Обработка критических ошибок, которые могут возникнуть во время цикла
+            logger.critical(`КРИТИЧЕСКАЯ ОШИБКА В ЦИКЛЕ: ${error.message}`);
         }
-        
-        logger.summary("--- Все кошельки обработаны для ВСЕХ игр. Бот завершил работу. ---");
 
-    } catch (error) {
-        logger.critical(error.message);
-        // rl.close() tidak diperlukan karena sudah dipanggil setelah getPlayCount
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+        let remainingDelay = DAILY_DELAY_MS - duration;
+
+        if (remainingDelay < 0) {
+            remainingDelay = 10000; // Minimal 10 detik jeda jika durasi melebihi 24 jam
+            logger.warn(`Продолжительность цикла (${(duration / 3600000).toFixed(2)} ч) превысила 24 часа. Начинаем следующий цикл через ${remainingDelay / 1000} секунд.`);
+        } else {
+            const minutesLeft = Math.ceil(remainingDelay / 1000 / 60);
+            logger.step(`Ожидание ${minutesLeft} минут до следующего цикла (24 часа)...`);
+        }
+
+        await sleep(remainingDelay);
     }
 };
 
